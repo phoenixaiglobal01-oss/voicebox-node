@@ -47,11 +47,25 @@ curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node
 
 # Python dependencies. torch is usually pre-installed in RunPod CUDA images;
 # pip skips anything already satisfied. chatterbox-tts pulls torchaudio.
+# Isolated venv: the pod's main env ships numpy-2-only packages (opencv,
+# scipy, contourpy) that conflict with chatterbox-tts (needs numpy<2).
+# A dedicated venv keeps the voice deps fully isolated from ComfyUI's env.
+VENV="$APP_DIR/venv"
+if [ ! -x "$VENV/bin/python" ]; then
+  echo "$(ts) creating isolated venv at $VENV ..." >> "$LOG"
+  if ! python3 -m venv "$VENV" >> "$LOG" 2>&1; then
+    echo "$(ts) venv failed, installing python3-venv ..." >> "$LOG"
+    (apt-get update -qq && apt-get install -y -qq python3-venv) >> "$LOG" 2>&1 || true
+    python3 -m venv "$VENV" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: venv creation failed" >> "$LOG"; exit 1; }
+  fi
+fi
+VPY="$VENV/bin/python"
+
 # Upgrade the installer toolchain first: the base image ships an old setuptools
 # whose pkg_resources breaks on Python 3.12 (AttributeError: module 'pkgutil'
 # has no attribute 'ImpImporter'), which kills building numpy from source.
 echo "$(ts) upgrading pip/setuptools/wheel ..." >> "$LOG"
-python3 -m pip install --quiet --disable-pip-version-check --upgrade \
+"$VPY" -m pip install --quiet --disable-pip-version-check --upgrade \
   pip setuptools wheel >> "$LOG" 2>&1 || true
 
 # Install numpy from a prebuilt wheel FIRST and forbid source builds for it:
@@ -59,18 +73,18 @@ python3 -m pip install --quiet --disable-pip-version-check --upgrade \
 # Python 3.12 (pkgutil.ImpImporter removed). A prebuilt numpy satisfies every
 # dependent (incl. chatterbox-tts) so pip never tries to compile it.
 echo "$(ts) installing numpy (prebuilt wheel, no source build) ..." >> "$LOG"
-python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
+"$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
   "numpy>=1.26,<2" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
 
 echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >> "$LOG"
-python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
+"$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
   "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" "chatterbox-tts" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: pip install failed" >> "$LOG"; exit 1; }
 
 # Start detached — survives this script exiting and the container's main process.
 cd "$APP_DIR"
 setsid nohup env VOICEBOX_API_KEY="$VOICEBOX_API_KEY" \
-  python3 -m uvicorn app:app --host 0.0.0.0 --port 8005 \
+  "$VPY" -m uvicorn app:app --host 0.0.0.0 --port 8005 \
   >> "$LOG" 2>&1 < /dev/null &
 echo "$(ts) voicebox starting (pid $!), logs at $LOG" >> "$LOG"
 echo "VoiceBox starting on :8005 — check $LOG; /v1/voicebox/health turns ready once the model loads."

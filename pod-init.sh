@@ -47,6 +47,13 @@ curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node
 
 # Python dependencies. torch is usually pre-installed in RunPod CUDA images;
 # pip skips anything already satisfied. chatterbox-tts pulls torchaudio.
+# Upgrade the installer toolchain first: the base image ships an old setuptools
+# whose pkg_resources breaks on Python 3.12 (AttributeError: module 'pkgutil'
+# has no attribute 'ImpImporter'), which kills building numpy from source.
+echo "$(ts) upgrading pip/setuptools/wheel ..." >> "$LOG"
+python3 -m pip install --quiet --disable-pip-version-check --upgrade \
+  pip setuptools wheel >> "$LOG" 2>&1 || true
+
 echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >> "$LOG"
 python3 -m pip install --quiet --disable-pip-version-check \
   "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" "chatterbox-tts" \

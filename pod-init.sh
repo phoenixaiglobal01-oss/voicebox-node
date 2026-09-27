@@ -55,65 +55,31 @@ curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node
 # pip skips anything already satisfied. chatterbox-tts pulls torchaudio.
 # Isolated venv: the pod's main env ships numpy-2-only packages (opencv,
 # scipy, contourpy) that conflict with chatterbox-tts (needs numpy<2).
-# A dedicated venv keeps the voice deps fully isolated from ComfyUI's env.
-VENV="$APP_DIR/venv"
-MARKER="$APP_DIR/.bootstrap-complete"
-# A previous run that failed halfway leaves a broken venv: wipe it so the
-# retry starts clean. A successful run leaves the marker behind.
-if [ ! -f "$MARKER" ] && [ -d "$VENV" ]; then
-  echo "$(ts) removing incomplete venv from a failed run ..." >> "$LOG"
-  rm -rf "$VENV"
-fi
-if [ ! -x "$VENV/bin/python" ]; then
-  echo "$(ts) creating isolated venv at $VENV ..." >> "$LOG"
-  if ! python3 -m venv "$VENV" >> "$LOG" 2>&1; then
-    echo "$(ts) venv failed, installing python3-venv ..." >> "$LOG"
-    (apt-get update -qq && apt-get install -y -qq python3-venv) >> "$LOG" 2>&1 || true
-    python3 -m venv "$VENV" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: venv creation failed" >> "$LOG"; exit 1; }
-  fi
-fi
-VPY="$VENV/bin/python"
-
-# Upgrade the installer toolchain first: the base image ships an old setuptools
-# whose pkg_resources breaks on Python 3.12 (AttributeError: module 'pkgutil'
-# has no attribute 'ImpImporter'), which kills building numpy from source.
-echo "$(ts) upgrading pip/setuptools/wheel ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check --upgrade \
-  pip setuptools wheel >> "$LOG" 2>&1 || true
-
-# Install numpy from a prebuilt wheel FIRST and forbid source builds for it:
-# this pod's toolchain insists on building numpy from source, which fails on
-# Python 3.12 (pkgutil.ImpImporter removed). A prebuilt numpy satisfies every
-# dependent (incl. chatterbox-tts) so pip never tries to compile it.
-echo "$(ts) installing numpy (prebuilt wheel, no source build) ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
-  "numpy>=1.26,<2" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
-
-echo "$(ts) installing torch (pinned for chatterbox, a few minutes) ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check \
-  "torch==2.6.0" "torchaudio==2.6.0" \
-  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: torch install failed" >> "$LOG"; exit 1; }
-
-# chatterbox-tts's pinned dependency set cannot be resolved by pip on this
-# pod (ResolutionImpossible across all 0.1.x). Install it WITHOUT deps and
-# add only the runtime libraries its multilingual TTS path actually imports.
-# (Skips gradio web UI, pykakasi/spacy-pkuseg language extras, pyloudnorm.)
-echo "$(ts) installing chatterbox-tts (no-deps, bypassing broken resolver) ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check --no-deps \
+# STRATEGY: use the system Python (ships working CUDA torch for ComfyUI).
+# The isolated venv cannot resolve torch/chatterbox pins on this pod, so we
+# install chatterbox-tts with --no-deps (pip never sees its broken pin set)
+# plus only the runtime libraries the multilingual TTS path actually imports.
+# --no-deps everywhere except the web server: nothing upgrades torch, numpy,
+# scipy or opencv, so ComfyUI is untouched.
+echo "$(ts) installing chatterbox-tts into system env (no-deps) ..." >> "$LOG"
+python3 -m pip install --quiet --disable-pip-version-check --no-deps \
   "chatterbox-tts==0.1.7" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: chatterbox install failed" >> "$LOG"; exit 1; }
 
-echo "$(ts) installing chatterbox runtime libraries ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
-  "transformers==5.2.0" "tokenizers" "diffusers==0.29.0" "librosa==0.11.0" \
-  "safetensors==0.5.3" "huggingface_hub" "einops" "omegaconf" "tqdm" \
-  "conformer==0.3.2" "s3tokenizer" "resemble-perth" "scipy" \
+echo "$(ts) installing chatterbox runtime libraries (no-deps, system-safe) ..." >> "$LOG"
+python3 -m pip install --quiet --disable-pip-version-check --no-deps \
+  "transformers" "tokenizers" "diffusers" "librosa" \
+  "safetensors" "huggingface_hub" "einops" "omegaconf" "tqdm" \
+  "conformer" "s3tokenizer" "resemble-perth" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: runtime libs install failed" >> "$LOG"; exit 1; }
 
 echo "$(ts) installing web server dependencies ..." >> "$LOG"
-"$VPY" -m pip install --quiet --disable-pip-version-check \
+python3 -m pip install --quiet --disable-pip-version-check \
   "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: web deps install failed" >> "$LOG"; exit 1; }
+
+# The service runs on the system python (no venv).
+VPY="python3"
 
 # Sanity check: the import the app needs must work.
 echo "$(ts) verifying chatterbox import ..." >> "$LOG"

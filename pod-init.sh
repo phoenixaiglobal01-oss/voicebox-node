@@ -24,11 +24,13 @@ touch "$LOG" 2>/dev/null || LOG="$APP_DIR/voicebox.log"
 
 ts() { date -u +%FT%TZ; }
 
-# Already running? Nothing to do.
-if curl -fsS --max-time 5 \
+# Already healthy? Nothing to do. A responding-but-broken service (ready:false)
+# must go through install to fix dependencies.
+HEALTH_JSON="$(curl -fsS --max-time 5 \
     -H "X-API-Key: ${VOICEBOX_API_KEY:-__none__}" \
-    http://127.0.0.1:8005/v1/voicebox/health >/dev/null 2>&1; then
-  echo "$(ts) voicebox already running — skipping install" >> "$LOG"
+    http://127.0.0.1:8005/v1/voicebox/health 2>/dev/null || echo '{}')"
+if echo "$HEALTH_JSON" | grep -q '"ready"[[:space:]]*:[[:space:]]*true'; then
+  echo "$(ts) voicebox already healthy — skipping install" >> "$LOG"
   exit 0
 fi
 

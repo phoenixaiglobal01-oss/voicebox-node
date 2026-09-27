@@ -56,6 +56,27 @@ ENGINE_ID = "chatterbox-mtl"
 # ISO 639-1 ids; anything unmapped falls back to English rather than failing.
 LANGUAGE_IDS = {"pt", "en", "es", "fr", "de", "it", "ja", "ko", "zh"}
 
+# --- perth watermarker fallback (must run before chatterbox import) ---
+# If resemble-perth failed to import PerthImplicitWatermarker (it becomes None
+# on any internal ImportError), chatterbox crashes at init. Watermarking is
+# non-essential for TTS, so substitute a no-op that passes audio through.
+try:
+    import perth as _perth
+
+    if getattr(_perth, "PerthImplicitWatermarker", None) is None:
+        class _NoOpWatermarker:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def apply_watermark(self, signal, *args, **kwargs):
+                return signal
+
+        _perth.PerthImplicitWatermarker = _NoOpWatermarker
+        log.warning("perth.PerthImplicitWatermarker unavailable — using no-op watermark")
+except Exception as _e:  # noqa: BLE001 — perth is optional
+    log.warning("perth import failed (%s) — watermark disabled", _e)
+# --- end perth fallback ---
+
 _model = None
 _model_error: str | None = None
 _model_lock = threading.Lock()

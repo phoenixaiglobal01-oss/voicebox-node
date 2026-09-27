@@ -54,8 +54,16 @@ echo "$(ts) upgrading pip/setuptools/wheel ..." >> "$LOG"
 python3 -m pip install --quiet --disable-pip-version-check --upgrade \
   pip setuptools wheel >> "$LOG" 2>&1 || true
 
+# Install numpy from a prebuilt wheel FIRST and forbid source builds for it:
+# this pod's toolchain insists on building numpy from source, which fails on
+# Python 3.12 (pkgutil.ImpImporter removed). A prebuilt numpy satisfies every
+# dependent (incl. chatterbox-tts) so pip never tries to compile it.
+echo "$(ts) installing numpy (prebuilt wheel, no source build) ..." >> "$LOG"
+python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
+  "numpy>=1.26" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
+
 echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >> "$LOG"
-python3 -m pip install --quiet --disable-pip-version-check \
+python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
   "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" "chatterbox-tts" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: pip install failed" >> "$LOG"; exit 1; }
 

@@ -66,8 +66,10 @@ python3 -m pip install --quiet --disable-pip-version-check --no-deps \
   "chatterbox-tts==0.1.7" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: chatterbox install failed" >> "$LOG"; exit 1; }
 
-echo "$(ts) installing chatterbox runtime libraries (no-deps, system-safe) ..." >> "$LOG"
-python3 -m pip install --quiet --disable-pip-version-check --no-deps \
+# Runtime libs WITH their own deps (only chatterbox-tts itself is --no-deps):
+# librosa hard-requires lazy_loader, transformers needs tokenizers, etc.
+echo "$(ts) installing chatterbox runtime libraries ..." >> "$LOG"
+python3 -m pip install --quiet --disable-pip-version-check \
   "transformers" "tokenizers" "diffusers" "librosa" \
   "safetensors" "huggingface_hub" "einops" "omegaconf" "tqdm" \
   "conformer" "s3tokenizer" "resemble-perth" \

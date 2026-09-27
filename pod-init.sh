@@ -82,13 +82,14 @@ python3 -m pip install --quiet --disable-pip-version-check \
 
 # The service runs on the system python (no venv).
 VPY="python3"
+MARKER="$APP_DIR/.bootstrap-complete"
 
 # Sanity check: the import the app needs must work.
 echo "$(ts) verifying chatterbox import ..." >> "$LOG"
 "$VPY" -c "from chatterbox.mtl_tts import ChatterboxMultilingualTTS; print('import OK')" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: chatterbox import failed" >> "$LOG"; exit 1; }
 
-# Dependencies are in: mark the bootstrap complete so future runs reuse the venv.
+# Dependencies are in: mark the bootstrap complete so future runs skip reinstall.
 touch "$MARKER"
 
 # Start detached — survives this script exiting and the container's main process.

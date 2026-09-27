@@ -35,7 +35,15 @@ HEALTH_JSON="$(curl -fsS --max-time 5 \
     -H "X-API-Key: ${VOICEBOX_API_KEY:-__none__}" \
     http://127.0.0.1:8005/v1/voicebox/health 2>/dev/null || echo '{}')"
 if echo "$HEALTH_JSON" | grep -q '"ready"[[:space:]]*:[[:space:]]*true'; then
-  echo "$(ts) voicebox already healthy — skipping install" >> "$LOG"
+  echo "$(ts) voicebox healthy — restarting to pick up refreshed app.py" >> "$LOG"
+  pkill -f "app:app" 2>/dev/null || true
+  pkill -f "uvicorn.*8005" 2>/dev/null || true
+  sleep 2
+  cd "$APP_DIR"
+  setsid nohup env VOICEBOX_API_KEY="$VOICEBOX_API_KEY" \
+    "$VPY" -m uvicorn app:app --host 0.0.0.0 --port 8005 \
+    >> "$LOG" 2>&1 < /dev/null &
+  echo "$(ts) voicebox restarted (pid $!), logs at $LOG" >> "$LOG"
   exit 0
 fi
 

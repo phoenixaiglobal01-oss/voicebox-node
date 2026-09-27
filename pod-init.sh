@@ -55,6 +55,13 @@ echo "$(ts) downloading voicebox app ..." >> "$LOG"
 curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node/a7efb24f67204b60ef5f9e48efb885c62406f4e0/app.py \
   -o "$APP_DIR/app.py" || { echo "$(ts) ERROR: app.py download failed" >> "$LOG"; exit 1; }
 
+# ffmpeg for MP3 encoding (wav_to_mp3 shells out to ffmpeg).
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "$(ts) installing ffmpeg ..." >> "$LOG"
+  (apt-get update -qq && apt-get install -y -qq ffmpeg) >> "$LOG" 2>&1 || \
+    echo "$(ts) WARNING: ffmpeg install failed — TTS MP3 may fail" >> "$LOG"
+fi
+
 # Python dependencies. torch is usually pre-installed in RunPod CUDA images;
 # pip skips anything already satisfied. chatterbox-tts pulls torchaudio.
 # Isolated venv: the pod's main env ships numpy-2-only packages (opencv,

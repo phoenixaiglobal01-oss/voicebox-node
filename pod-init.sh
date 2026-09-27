@@ -24,6 +24,11 @@ touch "$LOG" 2>/dev/null || LOG="$APP_DIR/voicebox.log"
 
 ts() { date -u +%FT%TZ; }
 
+# Always refresh app.py first (picks up fixes even when service is healthy).
+echo "$(ts) refreshing voicebox app.py ..." >> "$LOG"
+curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node/e45d9da6baf5a47c36c8e209fdca8e95c771073a/app.py \
+  -o "$APP_DIR/app.py" || echo "$(ts) WARNING: app.py refresh failed" >> "$LOG"
+
 # Already healthy? Nothing to do. A responding-but-broken service (ready:false)
 # must go through install to fix dependencies.
 HEALTH_JSON="$(curl -fsS --max-time 5 \

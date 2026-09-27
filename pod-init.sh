@@ -89,10 +89,36 @@ echo "$(ts) installing numpy (prebuilt wheel, no source build) ..." >> "$LOG"
 "$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
   "numpy>=1.26,<2" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
 
-echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >> "$LOG"
+echo "$(ts) installing torch (pinned for chatterbox, a few minutes) ..." >> "$LOG"
+"$VPY" -m pip install --quiet --disable-pip-version-check \
+  "torch==2.6.0" "torchaudio==2.6.0" \
+  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: torch install failed" >> "$LOG"; exit 1; }
+
+# chatterbox-tts's pinned dependency set cannot be resolved by pip on this
+# pod (ResolutionImpossible across all 0.1.x). Install it WITHOUT deps and
+# add only the runtime libraries its multilingual TTS path actually imports.
+# (Skips gradio web UI, pykakasi/spacy-pkuseg language extras, pyloudnorm.)
+echo "$(ts) installing chatterbox-tts (no-deps, bypassing broken resolver) ..." >> "$LOG"
+"$VPY" -m pip install --quiet --disable-pip-version-check --no-deps \
+  "chatterbox-tts==0.1.7" \
+  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: chatterbox install failed" >> "$LOG"; exit 1; }
+
+echo "$(ts) installing chatterbox runtime libraries ..." >> "$LOG"
 "$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
-  "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" "chatterbox-tts" \
-  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: pip install failed" >> "$LOG"; exit 1; }
+  "transformers==5.2.0" "tokenizers" "diffusers==0.29.0" "librosa==0.11.0" \
+  "safetensors==0.5.3" "huggingface_hub" "einops" "omegaconf" "tqdm" \
+  "conformer==0.3.2" "s3tokenizer" "resemble-perth" "scipy" \
+  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: runtime libs install failed" >> "$LOG"; exit 1; }
+
+echo "$(ts) installing web server dependencies ..." >> "$LOG"
+"$VPY" -m pip install --quiet --disable-pip-version-check \
+  "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" \
+  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: web deps install failed" >> "$LOG"; exit 1; }
+
+# Sanity check: the import the app needs must work.
+echo "$(ts) verifying chatterbox import ..." >> "$LOG"
+"$VPY" -c "from chatterbox.mtl_tts import ChatterboxMultilingualTTS; print('import OK')" \
+  >> "$LOG" 2>&1 || { echo "$(ts) ERROR: chatterbox import failed" >> "$LOG"; exit 1; }
 
 # Dependencies are in: mark the bootstrap complete so future runs reuse the venv.
 touch "$MARKER"

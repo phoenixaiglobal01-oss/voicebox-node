@@ -57,6 +57,13 @@ curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node
 # scipy, contourpy) that conflict with chatterbox-tts (needs numpy<2).
 # A dedicated venv keeps the voice deps fully isolated from ComfyUI's env.
 VENV="$APP_DIR/venv"
+MARKER="$APP_DIR/.bootstrap-complete"
+# A previous run that failed halfway leaves a broken venv: wipe it so the
+# retry starts clean. A successful run leaves the marker behind.
+if [ ! -f "$MARKER" ] && [ -d "$VENV" ]; then
+  echo "$(ts) removing incomplete venv from a failed run ..." >> "$LOG"
+  rm -rf "$VENV"
+fi
 if [ ! -x "$VENV/bin/python" ]; then
   echo "$(ts) creating isolated venv at $VENV ..." >> "$LOG"
   if ! python3 -m venv "$VENV" >> "$LOG" 2>&1; then
@@ -86,6 +93,9 @@ echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >>
 "$VPY" -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
   "fastapi>=0.110" "uvicorn[standard]>=0.29" "requests>=2.31" "chatterbox-tts" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: pip install failed" >> "$LOG"; exit 1; }
+
+# Dependencies are in: mark the bootstrap complete so future runs reuse the venv.
+touch "$MARKER"
 
 # Start detached — survives this script exiting and the container's main process.
 cd "$APP_DIR"

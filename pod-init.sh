@@ -11,6 +11,12 @@
 # Requires VOICEBOX_API_KEY in the environment (set by the RunPod template).
 set -u
 
+# Isolate from any venv activated in the calling shell (e.g. the pod's
+# .venv-cu128): a leaked PYTHONPATH would expose numpy-2-only packages
+# (opencv, scipy, contourpy) inside our isolated venv and break pip's
+# dependency resolution for chatterbox-tts (needs numpy<2).
+unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
+
 APP_DIR=/opt/voicebox
 LOG=/var/log/voicebox.log
 mkdir -p "$APP_DIR"

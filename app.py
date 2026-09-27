@@ -151,12 +151,19 @@ def synth_wav(text: str, language: str, voice: str | None, style: str | None):
 
 def wav_to_mp3(wav, sr: int, speed: float) -> tuple[bytes, float]:
     """Encode to mp3 via ffmpeg, applying tempo for speed (best-effort)."""
-    import torchaudio
+    from scipy.io import wavfile
+    import numpy as np
 
     with tempfile.TemporaryDirectory() as tmp:
         wav_path = os.path.join(tmp, "in.wav")
         mp3_path = os.path.join(tmp, "out.mp3")
-        torchaudio.save(wav_path, wav.unsqueeze(0) if wav.dim() == 1 else wav, sr)
+        # torchaudio.save needs torchcodec; use scipy instead (already installed)
+        wav_np = wav.detach().cpu().numpy() if hasattr(wav, 'detach') else np.asarray(wav)
+        if wav_np.ndim == 1:
+            wav_np = wav_np[np.newaxis, :]
+        # wavfile.write expects (samples, channels) for stereo, or (samples,) for mono
+        wav_np = wav_np.T if wav_np.shape[0] <= 2 else wav_np
+        wavfile.write(wav_path, sr, wav_np)
         tempo = max(0.5, min(2.0, speed or 1.0))
         # atempo only accepts 0.5–2.0 per filter; chain for safety.
         filters = []

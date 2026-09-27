@@ -60,7 +60,7 @@ python3 -m pip install --quiet --disable-pip-version-check --upgrade \
 # dependent (incl. chatterbox-tts) so pip never tries to compile it.
 echo "$(ts) installing numpy (prebuilt wheel, no source build) ..." >> "$LOG"
 python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \
-  "numpy>=1.26" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
+  "numpy>=1.26,<2" >> "$LOG" 2>&1 || { echo "$(ts) ERROR: numpy install failed" >> "$LOG"; exit 1; }
 
 echo "$(ts) installing python dependencies (a few minutes on first boot) ..." >> "$LOG"
 python3 -m pip install --quiet --disable-pip-version-check --only-binary=numpy \

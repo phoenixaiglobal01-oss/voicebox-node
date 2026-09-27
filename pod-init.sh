@@ -94,6 +94,11 @@ echo "$(ts) verifying chatterbox import ..." >> "$LOG"
 # Dependencies are in: mark the bootstrap complete so future runs skip reinstall.
 touch "$MARKER"
 
+# Kill any existing broken server (frees port 8005) before starting fresh.
+pkill -f "app:app" 2>/dev/null || true
+pkill -f "uvicorn.*8005" 2>/dev/null || true
+sleep 2
+
 # Start detached — survives this script exiting and the container's main process.
 cd "$APP_DIR"
 setsid nohup env VOICEBOX_API_KEY="$VOICEBOX_API_KEY" \

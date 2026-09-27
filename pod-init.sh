@@ -70,7 +70,7 @@ python3 -m pip install --quiet --disable-pip-version-check --no-deps \
 # librosa hard-requires lazy_loader, transformers needs tokenizers, etc.
 echo "$(ts) installing chatterbox runtime libraries ..." >> "$LOG"
 python3 -m pip install --quiet --disable-pip-version-check \
-  "transformers" "tokenizers" "diffusers" "librosa" \
+  "transformers" "tokenizers" "diffusers" "librosa==0.11.0" \
   "safetensors" "huggingface_hub" "einops" "omegaconf" "tqdm" \
   "conformer" "s3tokenizer" "resemble-perth" \
   >> "$LOG" 2>&1 || { echo "$(ts) ERROR: runtime libs install failed" >> "$LOG"; exit 1; }

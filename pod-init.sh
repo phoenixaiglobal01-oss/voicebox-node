@@ -51,8 +51,8 @@ fi
 # Latest service code (public repo).
 echo "$(ts) downloading voicebox app ..." >> "$LOG"
 # Pin app.py by commit SHA to bypass raw.githubusercontent.com CDN cache on main.
-# a7efb24f = perth NoOpWatermarker fallback (unblocks chatterbox init).
-curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node/a7efb24f67204b60ef5f9e48efb885c62406f4e0/app.py \
+# e45d9da = perth NoOpWatermarker fallback + scipy wavfile (torchcodec fix).
+curl -fsSL https://raw.githubusercontent.com/phoenixaiglobal01-oss/voicebox-node/e45d9da6baf5a47c36c8e209fdca8e95c771073a/app.py \
   -o "$APP_DIR/app.py" || { echo "$(ts) ERROR: app.py download failed" >> "$LOG"; exit 1; }
 
 # ffmpeg for MP3 encoding (wav_to_mp3 shells out to ffmpeg).
